@@ -21,6 +21,7 @@ import Pricing from './pages/Pricing';
 import WalletPage from './pages/WalletPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import NotFound from './pages/NotFound';
+import AuthCallback from './pages/AuthCallback';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -59,6 +60,7 @@ const App = () => {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Private */}
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
