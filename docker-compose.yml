@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Redis for queuing and caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # Coqui TTS for voice generation
+  coqui-tts:
+    image: ghcr.io/coqui-ai/tts:latest
+    ports:
+      - "5002:5002"
+    environment:
+      - TTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+    volumes:
+      - tts_models:/root/.local/share/tts
+    restart: unless-stopped
+
+  # Whisper for subtitle generation
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    ports:
+      - "9000:8000"
+    environment:
+      - WHISPER__MODEL=base
+    restart: unless-stopped
+
+  # LibreTranslate for translation
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "5003:5000"
+    environment:
+      - LT_LOAD_ONLY=en,es,fr,de,pt,it,ja,ko,zh,ar,hi,ru
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  tts_models:

@@ -1,0 +1,46 @@
+# ─── Environment (NEVER push these) ───────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Dependencies ─────────────────────────────────────────
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# ─── Build outputs ────────────────────────────────────────
+client/build/
+server/dist/
+
+# ─── Logs (gitignored — use Sentry for prod tracking) ─────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Redis ────────────────────────────────────────────────
+dump.rdb
+
+# ─── Temp uploads ─────────────────────────────────────────
+uploads/temp/
+server/uploads/
+
+# ─── Coverage ─────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Internal AI / Dev docs — NEVER push ──────────────────
+CLAUDE.md
+SKILLS.md
+docs/

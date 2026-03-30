@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --electric-blue: #1A73E8;
+  --neon-mint: #00E5A0;
+  --deep-dark: #0D1117;
+  --white: #FFFFFF;
+  --gray: #888780;
+  --dark-card: #161B22;
+  --dark-border: #21262D;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--deep-dark);
+  color: var(--white);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--deep-dark); }
+::-webkit-scrollbar-thumb { background: var(--dark-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #30363D; }
+
+/* Selection */
+::selection { background: var(--electric-blue); color: white; }
+
+/* Focus ring */
+:focus-visible { outline: 2px solid var(--electric-blue); outline-offset: 2px; }
+
+/* Custom utility classes */
+.gradient-text {
+  background: linear-gradient(135deg, #1A73E8, #00E5A0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass-card {
+  background: rgba(22, 27, 34, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(33, 38, 45, 0.8);
+}
+
+.btn-primary {
+  @apply bg-electric-blue hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 min-h-[44px] flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-dark-card hover:bg-dark-hover text-white font-medium px-6 py-3 rounded-lg border border-dark-border transition-all duration-200 min-h-[44px] flex items-center justify-center gap-2;
+}
+
+.btn-mint {
+  @apply bg-neon-mint hover:bg-green-400 text-deep-dark font-semibold px-6 py-3 rounded-lg transition-all duration-200 min-h-[44px] flex items-center justify-center gap-2;
+}
+
+.input-field {
+  @apply bg-dark-card border border-dark-border rounded-lg px-4 py-3 text-white placeholder-cz-gray focus:outline-none focus:border-electric-blue transition-colors w-full;
+}
+
+.card {
+  @apply bg-dark-card border border-dark-border rounded-xl p-6;
+}
+
+/* Progress bar animation */
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.progress-pulse { animation: progress-pulse 2s ease-in-out infinite; }
+
+/* Zoom ring animation */
+@keyframes zoom-ring {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.zoom-ring { animation: zoom-ring 1.5s ease-in-out infinite; }
