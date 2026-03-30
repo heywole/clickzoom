@@ -9,7 +9,7 @@ export const authService = {
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post('/auth/reset-password', { token, password }),
   verifyEmail: (token) => api.get(`/auth/verify-email/${token}`),
-  googleAuth: () => { window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/google`; },
+  googleAuth: () => { window.location.href = `https://clickzoom-production.up.railway.app/api/auth/google`; },
 };
 
 // User

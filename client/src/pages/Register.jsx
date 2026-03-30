@@ -37,7 +37,7 @@ const Register = () => {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleGoogleSignup = () => {
-    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/google`;
+    window.location.href = `https://clickzoom-production.up.railway.app/api/auth/google`;
   };
 
   const handleSubmit = async (e) => {
