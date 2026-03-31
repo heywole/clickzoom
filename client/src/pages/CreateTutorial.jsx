@@ -3,208 +3,265 @@ import { useNavigate } from 'react-router-dom';
 import useTutorial from '../hooks/useTutorial';
 import useAuth from '../hooks/useAuth';
 import useToast from '../hooks/useToast';
-import StepEditor from '../components/tutorial/StepEditor';
-import VoiceSettings from '../components/tutorial/VoiceSettings';
-import OutputSelector from '../components/tutorial/OutputSelector';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
+import OutputSelector from '../components/tutorial/OutputSelector';
 import ProgressBar from '../components/tutorial/ProgressBar';
 
-const WIZARD_STEPS = [
-  'Tutorial Info',
-  'Content & Steps',
-  'Voice Settings',
-  'Output Type',
-  'Review & Generate',
-];
+const EXAMPLE_CONTENT = `Example:
+
+Hashi BTC Tutorial
+
+Go to https://devnet.hashi.sui.io
+• Connect your SUI Wallet
+• Click "Receive BTC" then copy your BTC address
+• Go to https://coinfaucet.eu/en/btc-testnet4/
+• Enter the address and claim BTC faucet
+• Submit your deposit request`;
+
+// Extract URLs from text
+const extractUrls = (text) => {
+  const urlRegex = /https?:\/\/[^\s\)>]+/g;
+  return [...new Set(text.match(urlRegex) || [])];
+};
 
 const CreateTutorial = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
   const { create, generate } = useTutorial();
-  const isPro = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'enterprise';
+  const isPro = user?.subscriptionTier !== 'free';
 
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [createdId, setCreatedId] = useState(null);
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    targetUrl: '',
-    inputMethod: 'automated',
-    steps: [],
-    voiceSettings: { language: 'en', voiceType: 'female', voiceStyle: 'professional', speed: 1, accent: '' },
-    outputType: null,
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [outputType, setOutputType] = useState(null);
+  const [showOutputSelector, setShowOutputSelector] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [voiceSettings, setVoiceSettings] = useState({
+    language: 'en', voiceType: 'female', voiceStyle: 'professional', speed: 1,
   });
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
 
-  const updateForm = (field, value) => setForm(f => ({ ...f, [field]: value }));
-
-  const canProceed = () => {
-    if (step === 0) return form.title.trim().length > 0;
-    if (step === 1) {
-      if (form.inputMethod === 'automated') return form.targetUrl.trim().length > 0;
-      return form.steps.length > 0;
-    }
-    if (step === 3) return form.outputType !== null;
-    return true;
-  };
-
-  const handleNext = () => {
-    if (!canProceed()) { toast.error('Please complete all required fields before continuing'); return; }
-    setStep(s => s + 1);
-  };
+  const detectedUrls = extractUrls(content);
 
   const handleGenerate = async () => {
+    if (!title.trim()) return toast.error('Please enter a title for your tutorial');
+    if (!content.trim()) return toast.error('Please enter your tutorial content or paste a URL');
+    if (!outputType) {
+      setShowOutputSelector(true);
+      toast.info('Please select an output type before generating');
+      return;
+    }
+
     setLoading(true);
+    setProgress(5);
+    setProgressLabel('Creating tutorial...');
+
     try {
-      let id = createdId;
-      if (!id) {
-        const result = await create({
-          title: form.title,
-          description: form.description,
-          targetUrl: form.targetUrl,
-          inputMethod: form.inputMethod,
-          outputType: form.outputType,
-          voiceSettings: form.voiceSettings,
-          steps: form.steps,
-        });
-        id = result.payload?.tutorial?._id;
-        setCreatedId(id);
-      }
-      if (!id) throw new Error('Failed to create tutorial');
-      await generate(id, form.outputType);
-      toast.success('Generation started! We will notify you when it is ready.');
-      navigate(`/tutorials/${id}`);
+      // Create the tutorial
+      const result = await create({
+        title: title.trim(),
+        description: content.trim(),
+        targetUrl: detectedUrls[0] || '',
+        inputMethod: detectedUrls.length > 0 ? 'automated' : 'manual',
+        outputType,
+        voiceSettings,
+        rawContent: content,
+        detectedUrls,
+      });
+
+      const tutorialId = result.payload?.tutorial?._id;
+      if (!tutorialId) throw new Error('Failed to create tutorial');
+
+      setProgress(20);
+      setProgressLabel('Starting generation...');
+
+      // Start generation
+      await generate(tutorialId, outputType);
+
+      setProgress(40);
+      setProgressLabel('ClickZoom is processing your content...');
+
+      toast.success('Generation started! You will be notified when ready.');
+      navigate(`/tutorials/${tutorialId}`);
     } catch (err) {
       toast.error(err.message || 'Failed to start generation');
-    } finally {
       setLoading(false);
+      setProgress(0);
     }
   };
-
-  const progress = ((step + 1) / WIZARD_STEPS.length) * 100;
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Create Tutorial</h1>
-        <p className="text-cz-gray text-sm">Step {step + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[step]}</p>
-        <div className="mt-4">
-          <ProgressBar value={progress} showPercent={false} color="blue" />
-        </div>
-        <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-          {WIZARD_STEPS.map((label, i) => (
-            <button key={i} onClick={() => i < step && setStep(i)}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors ${
-                i === step ? 'bg-electric-blue text-white font-semibold' :
-                i < step ? 'bg-neon-mint/20 text-neon-mint cursor-pointer' :
-                'bg-dark-card text-cz-gray'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Create Tutorial</h1>
+        <p className="text-cz-gray text-sm mt-1">
+          Paste a URL, write instructions, or drop any content. ClickZoom does the rest.
+        </p>
       </div>
 
-      <div className="bg-dark-card border border-dark-border rounded-2xl p-6 md:p-8 mb-6">
-        {/* Step 0: Tutorial Info */}
-        {step === 0 && (
-          <div className="space-y-5">
-            <Input label="Tutorial Title" name="title" value={form.title} onChange={e => updateForm('title', e.target.value)} placeholder="e.g. How to swap tokens on Uniswap" required />
-            <Input label="Description (optional)" name="description" type="textarea" value={form.description} onChange={e => updateForm('description', e.target.value)} placeholder="Brief description of what this tutorial covers..." />
-          </div>
-        )}
+      {/* Main creation card */}
+      <div className="bg-dark-card border border-dark-border rounded-2xl p-6 mb-4">
 
-        {/* Step 1: Content */}
-        {step === 1 && (
-          <div className="space-y-6">
-            <div>
-              <label className="text-sm font-medium text-gray-300 mb-3 block">Input Method</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: 'automated', label: 'Automated URL Capture', icon: '🤖', desc: 'ClickZoom visits and captures automatically' },
-                  { value: 'manual', label: 'Manual Upload', icon: '📤', desc: 'Upload screenshots and write steps yourself' },
-                ].map(opt => (
-                  <button key={opt.value} onClick={() => updateForm('inputMethod', opt.value)}
-                    className={`p-4 rounded-xl border-2 text-left transition-colors ${form.inputMethod === opt.value ? 'border-electric-blue bg-electric-blue/5' : 'border-dark-border hover:border-electric-blue/40'}`}>
-                    <div className="text-2xl mb-2">{opt.icon}</div>
-                    <p className="font-semibold text-white text-sm">{opt.label}</p>
-                    <p className="text-xs text-cz-gray mt-1">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
+        {/* Title */}
+        <div className="mb-5">
+          <label className="text-sm font-medium text-gray-300 mb-2 block">
+            Tutorial Title <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. How to bridge tokens on Base"
+            className="bg-deep-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-cz-gray focus:outline-none focus:border-electric-blue w-full text-sm"
+          />
+        </div>
+
+        {/* Content area */}
+        <div className="mb-5">
+          <label className="text-sm font-medium text-gray-300 mb-2 block">
+            Content <span className="text-red-400">*</span>
+          </label>
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder={EXAMPLE_CONTENT}
+            rows={10}
+            className="bg-deep-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-cz-gray/50 focus:outline-none focus:border-electric-blue w-full text-sm resize-none leading-relaxed"
+          />
+          <p className="text-xs text-cz-gray mt-2">
+            Paste a URL, write step by step instructions, or drop any tutorial content. ClickZoom automatically detects URLs and visits them to capture the tutorial.
+          </p>
+        </div>
+
+        {/* Detected URLs */}
+        {detectedUrls.length > 0 && (
+          <div className="mb-5 bg-neon-mint/5 border border-neon-mint/20 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-neon-mint text-sm font-semibold">✓ {detectedUrls.length} URL{detectedUrls.length > 1 ? 's' : ''} detected</span>
             </div>
-
-            {form.inputMethod === 'automated' ? (
-              <Input label="Target URL" name="targetUrl" type="url" value={form.targetUrl}
-                onChange={e => updateForm('targetUrl', e.target.value)}
-                placeholder="https://app.uniswap.org" required
-                hint="ClickZoom will visit this URL, navigate it, detect click targets, and capture every step automatically." />
-            ) : (
-              <div>
-                <label className="text-sm font-medium text-gray-300 mb-3 block">Tutorial Steps</label>
-                <StepEditor steps={form.steps} onChange={steps => updateForm('steps', steps)} isAutomated={false} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Voice */}
-        {step === 2 && (
-          <div>
-            <h3 className="font-semibold text-white mb-4">Voice Settings</h3>
-            <VoiceSettings settings={form.voiceSettings} onChange={vs => updateForm('voiceSettings', vs)} />
-          </div>
-        )}
-
-        {/* Step 3: Output */}
-        {step === 3 && (
-          <div>
-            <h3 className="font-semibold text-white mb-4">Choose Output Type</h3>
-            <OutputSelector selected={form.outputType} onChange={ot => updateForm('outputType', ot)} isPro={isPro} />
-          </div>
-        )}
-
-        {/* Step 4: Review */}
-        {step === 4 && (
-          <div className="space-y-5">
-            <h3 className="font-semibold text-white mb-4">Review and Generate</h3>
-            {[
-              { label: 'Title', value: form.title },
-              { label: 'Input Method', value: form.inputMethod === 'automated' ? `Automated capture from ${form.targetUrl}` : `Manual (${form.steps.length} steps)` },
-              { label: 'Language', value: form.voiceSettings.language?.toUpperCase() },
-              { label: 'Voice', value: `${form.voiceSettings.voiceType} · ${form.voiceSettings.voiceStyle} · ${form.voiceSettings.speed}x` },
-              { label: 'Output Type', value: form.outputType ? form.outputType.charAt(0).toUpperCase() + form.outputType.slice(1) : 'Not selected' },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between items-start py-3 border-b border-dark-border last:border-0">
-                <span className="text-cz-gray text-sm">{label}</span>
-                <span className="text-white text-sm font-medium text-right max-w-[60%]">{value}</span>
-              </div>
-            ))}
-            <div className="bg-neon-mint/5 border border-neon-mint/20 rounded-xl p-4 mt-4">
-              <p className="text-sm text-neon-mint font-medium">Ready to generate</p>
-              <p className="text-xs text-cz-gray mt-1">Output type cannot be changed once generation begins. Free users are limited to one output per tutorial.</p>
+            <div className="space-y-1">
+              {detectedUrls.map((url, i) => (
+                <p key={i} className="text-xs text-cz-gray truncate">
+                  <span className="text-electric-blue mr-2">{i + 1}.</span>{url}
+                </p>
+              ))}
             </div>
+            <p className="text-xs text-neon-mint mt-2">ClickZoom will automatically visit and capture these sites.</p>
           </div>
         )}
-      </div>
 
-      {/* Navigation buttons */}
-      <div className="flex justify-between">
-        <Button variant="secondary" onClick={() => step === 0 ? null : setStep(s => s - 1)} disabled={step === 0}>
-          Back
-        </Button>
-        {step < WIZARD_STEPS.length - 1 ? (
-          <Button onClick={handleNext} disabled={!canProceed()}>Next</Button>
-        ) : (
-          <Button variant="mint" onClick={handleGenerate} loading={loading}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        {/* Voice settings toggle */}
+        <div className="mb-5">
+          <button
+            onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+            className="flex items-center gap-2 text-sm text-cz-gray hover:text-white transition-colors"
+          >
+            <svg className={`w-4 h-4 transition-transform ${showVoiceSettings ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Generate Content
-          </Button>
+            Voice Settings (optional)
+          </button>
+
+          {showVoiceSettings && (
+            <div className="mt-4 grid grid-cols-2 gap-4 p-4 bg-deep-dark rounded-xl border border-dark-border">
+              <div>
+                <label className="text-xs text-cz-gray mb-2 block">Language</label>
+                <select value={voiceSettings.language} onChange={e => setVoiceSettings(v => ({ ...v, language: e.target.value }))}
+                  className="bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-electric-blue w-full">
+                  {[['en','English'],['es','Spanish'],['fr','French'],['de','German'],['pt','Portuguese'],['yo','Yoruba'],['ha','Hausa'],['sw','Swahili']].map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-cz-gray mb-2 block">Voice Type</label>
+                <div className="flex gap-2">
+                  {['male','female','neutral'].map(v => (
+                    <button key={v} onClick={() => setVoiceSettings(vs => ({ ...vs, voiceType: v }))}
+                      className={`flex-1 py-2 rounded-lg text-xs capitalize transition-colors ${voiceSettings.voiceType === v ? 'bg-electric-blue text-white' : 'bg-dark-card border border-dark-border text-cz-gray'}`}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-cz-gray mb-2 block">Style</label>
+                <div className="flex gap-1 flex-wrap">
+                  {['professional','friendly','energetic','calm'].map(s => (
+                    <button key={s} onClick={() => setVoiceSettings(vs => ({ ...vs, voiceStyle: s }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs capitalize transition-colors ${voiceSettings.voiceStyle === s ? 'bg-electric-blue text-white' : 'bg-dark-card border border-dark-border text-cz-gray'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-cz-gray mb-2 block">Speed</label>
+                <div className="flex gap-1">
+                  {[['0.75x',0.75],['1x',1],['1.25x',1.25],['1.5x',1.5]].map(([label, val]) => (
+                    <button key={val} onClick={() => setVoiceSettings(vs => ({ ...vs, speed: val }))}
+                      className={`flex-1 py-1.5 rounded-lg text-xs transition-colors ${voiceSettings.speed === val ? 'bg-electric-blue text-white' : 'bg-dark-card border border-dark-border text-cz-gray'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Output type toggle */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowOutputSelector(!showOutputSelector)}
+            className="flex items-center gap-2 text-sm text-cz-gray hover:text-white transition-colors"
+          >
+            <svg className={`w-4 h-4 transition-transform ${showOutputSelector ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            Output Type {outputType ? <span className="text-neon-mint">({outputType})</span> : <span className="text-red-400">— required</span>}
+          </button>
+
+          {showOutputSelector && (
+            <div className="mt-4">
+              <OutputSelector selected={outputType} onChange={setOutputType} isPro={isPro} />
+            </div>
+          )}
+        </div>
+
+        {/* Progress bar when generating */}
+        {loading && (
+          <div className="mb-5">
+            <ProgressBar value={progress} label={progressLabel} animated color="mint" />
+          </div>
         )}
+
+        {/* Generate button */}
+        <Button
+          onClick={handleGenerate}
+          loading={loading}
+          variant="mint"
+          fullWidth
+          disabled={!title.trim() || !content.trim()}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Generate Tutorial
+        </Button>
+      </div>
+
+      {/* Tips */}
+      <div className="bg-electric-blue/5 border border-electric-blue/20 rounded-xl p-5">
+        <p className="text-sm font-semibold text-white mb-3">Tips for best results</p>
+        <div className="space-y-2 text-xs text-cz-gray">
+          <p>🔗 Include the full URL of the site you want to demonstrate</p>
+          <p>📝 Write clear step by step instructions alongside the URL</p>
+          <p>🌐 Works with any website including DeFi, NFT, and Web3 platforms</p>
+          <p>💡 The more detail you provide, the better the tutorial output</p>
+        </div>
       </div>
     </div>
   );
