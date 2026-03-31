@@ -6,6 +6,8 @@ export const login = createAsyncThunk('auth/login', async (credentials, { reject
   try {
     const { data } = await authService.login(credentials);
     setAccessToken(data.accessToken);
+    // Persist user in localStorage so refresh works
+    localStorage.setItem('cz_user', JSON.stringify(data.user));
     return data;
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Login failed');
@@ -25,8 +27,10 @@ export const logout = createAsyncThunk('auth/logout', async (_, { rejectWithValu
   try {
     await authService.logout();
     clearAccessToken();
+    localStorage.removeItem('cz_user');
   } catch (err) {
     clearAccessToken();
+    localStorage.removeItem('cz_user');
     return rejectWithValue(err.response?.data?.message || 'Logout failed');
   }
 });
@@ -34,18 +38,42 @@ export const logout = createAsyncThunk('auth/logout', async (_, { rejectWithValu
 export const fetchProfile = createAsyncThunk('auth/fetchProfile', async (_, { rejectWithValue }) => {
   try {
     const { data } = await userService.getProfile();
+    localStorage.setItem('cz_user', JSON.stringify(data.user));
     return data;
   } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Failed to fetch profile');
+    // Try refresh token first before giving up
+    try {
+      const { data: refreshData } = await authService.refreshToken();
+      setAccessToken(refreshData.accessToken);
+      const { data: profileData } = await userService.getProfile();
+      localStorage.setItem('cz_user', JSON.stringify(profileData.user));
+      return profileData;
+    } catch {
+      clearAccessToken();
+      localStorage.removeItem('cz_user');
+      return rejectWithValue('Session expired');
+    }
   }
 });
+
+// Get persisted user from localStorage for initial state
+const getPersistedUser = () => {
+  try {
+    const stored = localStorage.getItem('cz_user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistedUser = getPersistedUser();
 
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
-    user: null,
-    isAuthenticated: false,
-    loading: false,
+    user: persistedUser,
+    isAuthenticated: !!persistedUser,
+    loading: !!persistedUser, // loading true if we have a user so we try to refresh
     error: null,
     registrationSuccess: false,
   },
@@ -55,6 +83,8 @@ const authSlice = createSlice({
     setUser: (state, action) => {
       state.user = action.payload;
       state.isAuthenticated = true;
+      state.loading = false;
+      localStorage.setItem('cz_user', JSON.stringify(action.payload));
     },
   },
   extraReducers: (builder) => {
@@ -81,14 +111,23 @@ const authSlice = createSlice({
       .addCase(logout.fulfilled, (state) => {
         state.user = null;
         state.isAuthenticated = false;
+        state.loading = false;
+      })
+      .addCase(fetchProfile.pending, (state) => {
+        state.loading = true;
       })
       .addCase(fetchProfile.fulfilled, (state, action) => {
         state.user = action.payload.user;
         state.isAuthenticated = true;
+        state.loading = false;
       })
       .addCase(fetchProfile.rejected, (state) => {
-        state.user = null;
-        state.isAuthenticated = false;
+        // Only clear if we don't have a persisted user
+        state.loading = false;
+        if (!getPersistedUser()) {
+          state.user = null;
+          state.isAuthenticated = false;
+        }
       });
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import useTutorial from '../hooks/useTutorial';
 import useAuth from '../hooks/useAuth';
@@ -8,7 +8,7 @@ import Loader from '../components/common/Loader';
 import ProgressBar from '../components/tutorial/ProgressBar';
 import Button from '../components/common/Button';
 import OutputSelector from '../components/tutorial/OutputSelector';
-import { contentService } from '../services/apiService';
+import { contentService, tutorialService } from '../services/apiService';
 import { formatDate, formatDuration } from '../utils/helpers';
 
 const TutorialDetail = () => {
@@ -21,37 +21,53 @@ const TutorialDetail = () => {
   const [generating, setGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [content, setContent] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const isPro = user?.subscriptionTier !== 'free';
+
+  const loadContent = useCallback(async () => {
+    try {
+      const { data } = await contentService.getByTutorial(id);
+      setContent(data.content);
+    } catch {}
+  }, [id]);
 
   useEffect(() => {
     fetchById(id);
     loadContent();
   }, [id]);
 
+  // Poll status when processing
   useEffect(() => {
     let interval;
+    let timer;
+
     if (current?.status === 'processing') {
+      // Progress animation
       interval = setInterval(() => {
-        setGenerationProgress(p => Math.min(p + Math.random() * 5, 90));
+        setGenerationProgress(p => Math.min(p + 1.5, 90));
         loadContent();
       }, 3000);
+
+      // Count elapsed time
+      timer = setInterval(() => {
+        setElapsedSeconds(s => s + 1);
+      }, 1000);
     } else if (current?.status === 'completed') {
       setGenerationProgress(100);
+      loadContent();
     }
-    return () => clearInterval(interval);
-  }, [current?.status]);
 
-  const loadContent = async () => {
-    try {
-      const { data } = await contentService.getByTutorial(id);
-      setContent(data.content);
-    } catch {}
-  };
+    return () => {
+      clearInterval(interval);
+      clearInterval(timer);
+    };
+  }, [current?.status]);
 
   const handleGenerate = async () => {
     if (!outputType) return toast.error('Please select an output type');
     setGenerating(true);
     setGenerationProgress(0);
+    setElapsedSeconds(0);
     try {
       await generate(id, outputType);
       toast.success('Generation started!');
@@ -63,11 +79,29 @@ const TutorialDetail = () => {
     }
   };
 
+  const handleCancelGeneration = async () => {
+    if (!window.confirm('Cancel this generation? The tutorial will go back to draft status.')) return;
+    try {
+      await tutorialService.update(id, { status: 'draft' });
+      toast.info('Generation cancelled');
+      fetchById(id);
+      setGenerationProgress(0);
+      setElapsedSeconds(0);
+    } catch {
+      toast.error('Failed to cancel');
+    }
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('Delete this tutorial permanently?')) return;
     await remove(id);
     toast.success('Tutorial deleted');
     navigate('/dashboard');
+  };
+
+  const formatElapsed = (s) => {
+    if (s < 60) return `${s}s`;
+    return `${Math.floor(s / 60)}m ${s % 60}s`;
   };
 
   if (loading && !current) return <Loader text="Loading tutorial..." />;
@@ -78,6 +112,8 @@ const TutorialDetail = () => {
     </div>
   );
 
+  const isStuck = current?.status === 'processing' && elapsedSeconds > 300; // 5 minutes
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -85,43 +121,61 @@ const TutorialDetail = () => {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <Link to="/dashboard" className="text-cz-gray hover:text-white transition-colors text-sm">← Dashboard</Link>
-            <span className="text-dark-border">/</span>
-            <span className="text-cz-gray text-sm">Tutorial</span>
           </div>
           <h1 className="text-2xl font-bold text-white">{current.title}</h1>
-          {current.description && <p className="text-cz-gray text-sm mt-1">{current.description}</p>}
-          <div className="flex items-center gap-3 mt-3">
+          {current.description && (
+            <p className="text-cz-gray text-sm mt-1 max-w-2xl line-clamp-2">{current.description}</p>
+          )}
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
             <Badge status={current.status} />
             <span className="text-xs text-cz-gray">Created {formatDate(current.createdAt)}</span>
             {current.targetUrl && (
-              <a href={current.targetUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-electric-blue hover:underline truncate max-w-[200px]">
+              <a href={current.targetUrl} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-electric-blue hover:underline truncate max-w-[200px]">
                 {current.targetUrl}
               </a>
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={handleDelete}>
-            <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </Button>
-        </div>
+        <button onClick={handleDelete}
+          className="p-2 rounded-lg text-cz-gray hover:text-red-400 hover:bg-red-900/20 transition-colors flex-shrink-0">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
       </div>
 
       {/* Processing progress */}
       {current.status === 'processing' && (
         <div className="bg-dark-card border border-electric-blue/30 rounded-xl p-6 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-electric-blue/20 flex items-center justify-center">
-              <div className="w-4 h-4 border-2 border-electric-blue border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-electric-blue/20 flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-electric-blue border-t-transparent rounded-full animate-spin" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Generating your content...</p>
+                <p className="text-xs text-cz-gray">
+                  {isStuck ? 'Taking longer than expected...' : `This usually takes 2 to 5 minutes · ${formatElapsed(elapsedSeconds)} elapsed`}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-white">Generating your content...</p>
-              <p className="text-xs text-cz-gray">This usually takes 2 to 5 minutes</p>
-            </div>
+            <Button variant="ghost" size="sm" onClick={handleCancelGeneration}>
+              Cancel
+            </Button>
           </div>
           <ProgressBar value={generationProgress} animated color="blue" />
+
+          {isStuck && (
+            <div className="mt-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+              <p className="text-yellow-400 text-sm font-medium">Generation is taking longer than usual</p>
+              <p className="text-cz-gray text-xs mt-1">This may be because FFmpeg is still being set up on the server. You can cancel and try again in a few minutes.</p>
+              <Button variant="secondary" size="sm" className="mt-3" onClick={handleCancelGeneration}>
+                Cancel and Try Again
+              </Button>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-3 mt-4 text-center">
             {['Capturing screenshots', 'Processing zoom effects', 'Generating voiceover'].map((s, i) => (
               <div key={i} className={`text-xs py-2 px-3 rounded-lg ${generationProgress > i * 30 ? 'bg-electric-blue/10 text-electric-blue' : 'bg-dark-border text-cz-gray'}`}>
@@ -132,28 +186,52 @@ const TutorialDetail = () => {
         </div>
       )}
 
+      {/* Failed status */}
+      {current.status === 'failed' && (
+        <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-red-400 text-2xl">✕</span>
+            <div>
+              <p className="font-semibold text-red-400">Generation Failed</p>
+              <p className="text-xs text-cz-gray mt-0.5">Something went wrong during generation. Please try again.</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => {
+            tutorialService.update(id, { status: 'draft' }).then(() => fetchById(id));
+          }}>
+            Reset and Try Again
+          </Button>
+        </div>
+      )}
+
       {/* Completed content */}
       {current.status === 'completed' && content && (
         <div className="bg-neon-mint/5 border border-neon-mint/20 rounded-xl p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-neon-mint/20 flex items-center justify-center text-neon-mint">✓</div>
+              <div className="w-8 h-8 rounded-full bg-neon-mint/20 flex items-center justify-center text-neon-mint font-bold">✓</div>
               <div>
                 <p className="font-semibold text-white">Content Ready</p>
-                <p className="text-xs text-cz-gray">{content.contentType === 'video' ? `${formatDuration(content.duration)} · ${content.qualitySettings?.resolution || '1080p'}` : `${content.fileUrls?.length || 0} annotated images`}</p>
+                <p className="text-xs text-cz-gray">Download now — files are available for 24 hours</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              {content.fileUrls?.map((url, i) => (
-                <a key={i} href={url} download className="bg-electric-blue hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  Download {i + 1}
+            <div className="flex gap-2 flex-wrap">
+              {content.downloadUrls?.map((url, i) => (
+                <a key={i} href={url} download
+                  className="flex items-center gap-2 bg-neon-mint hover:bg-green-400 text-deep-dark font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {content.contentType === 'video' && i === 0 ? 'Download Video' :
+                   content.contentType === 'video' && i === 1 ? 'Download Subtitles' :
+                   `Download Image ${i + 1}`}
                 </a>
               ))}
             </div>
           </div>
-          {content.contentType === 'video' && content.fileUrls?.[0] && (
-            <div className="aspect-video rounded-lg overflow-hidden bg-black">
-              <video src={content.fileUrls[0]} controls className="w-full h-full" />
+          {content.contentType === 'video' && content.downloadUrls?.[0] && (
+            <div className="aspect-video rounded-xl overflow-hidden bg-black mt-4">
+              <video src={content.downloadUrls[0]} controls className="w-full h-full" />
             </div>
           )}
         </div>
@@ -187,7 +265,7 @@ const TutorialDetail = () => {
       <div className="bg-dark-card border border-dark-border rounded-xl p-6">
         <h2 className="font-semibold text-white mb-4">Tutorial Steps ({current.steps?.length || 0})</h2>
         {(!current.steps || current.steps.length === 0) ? (
-          <p className="text-cz-gray text-sm text-center py-6">No steps captured yet. Steps will appear here after automated capture.</p>
+          <p className="text-cz-gray text-sm text-center py-6">No steps captured yet. Steps will appear here after automated capture completes.</p>
         ) : (
           <div className="space-y-3">
             {current.steps.map((step, i) => (

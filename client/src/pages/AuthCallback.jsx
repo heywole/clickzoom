@@ -18,10 +18,8 @@ const AuthCallback = () => {
       return;
     }
 
-    // Store the access token
     setAccessToken(token);
 
-    // Fetch user profile
     userService.getProfile()
       .then(({ data }) => {
         dispatch(setUser(data.user));
@@ -30,7 +28,7 @@ const AuthCallback = () => {
       .catch(() => {
         navigate('/login?error=auth_failed');
       });
-  }, []);
+  }, [dispatch, navigate, searchParams]);
 
   return (
     <div className="min-h-screen bg-deep-dark flex items-center justify-center">
