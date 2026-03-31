@@ -122,13 +122,11 @@ const authSlice = createSlice({
         state.loading = false;
       })
       .addCase(fetchProfile.rejected, (state) => {
-        // Only clear if we don't have a persisted user
         state.loading = false;
-        if (!getPersistedUser()) {
-          state.user = null;
-          state.isAuthenticated = false;
-        }
-      });
+        state.user = null;
+        state.isAuthenticated = false;
+        localStorage.removeItem('cz_user'); // ← add this
+     });
   },
 });
 
