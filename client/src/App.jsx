@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { fetchProfile } from './store/authSlice';
 import useAuth from './hooks/useAuth';
 import Layout from './components/layout/Layout';
 import Toast from './components/common/Toast';
@@ -31,28 +30,6 @@ const PublicRoute = ({ children }) => {
 };
 
 const App = () => {
-  const dispatch = useDispatch();
-  const [appReady, setAppReady] = useState(false);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setAppReady(true), 1500);
-    dispatch(fetchProfile()).finally(() => {
-      setAppReady(true);
-      clearTimeout(timeout);
-    });
-    return () => clearTimeout(timeout);
-  }, [dispatch]);
-
-  if (!appReady) {
-    return (
-      <div style={{ minHeight:'100vh', background:'#0D1117', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'16px' }}>
-        <div style={{ width:'40px', height:'40px', border:'3px solid #21262D', borderTopColor:'#1A73E8', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
-        <p style={{ color:'#888780', fontSize:'14px', fontFamily:'sans-serif' }}>Loading ClickZoom...</p>
-        <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-      </div>
-    );
-  }
-
   return (
     <>
       <Toast />
