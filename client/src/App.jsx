@@ -35,7 +35,7 @@ const App = () => {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    const timeout = setTimeout(() => setAppReady(true), 3000);
+    const timeout = setTimeout(() => setAppReady(true), 1500);
     dispatch(fetchProfile()).finally(() => {
       setAppReady(true);
       clearTimeout(timeout);
