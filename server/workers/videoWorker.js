@@ -9,6 +9,15 @@ const { saveLocalFile, scheduleDelete } = require('../config/storage');
 const { sendContentReadyEmail } = require('../utils/email');
 const User = require('../models/User');
 const fs = require('fs').promises;
+const axios = require('axios');
+const os = require('os');
+
+const downloadScreenshot = async (url, tutorialId, stepNumber) => {
+  const tmpPath = require('path').join(os.tmpdir(), tutorialId+'_step_'+stepNumber+'.png');
+  const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+  await fs.writeFile(tmpPath, response.data);
+  return tmpPath;
+};
 const path = require('path');
 
 videoQueue.process('generate-video', 2, async (job) => {
@@ -21,20 +30,32 @@ videoQueue.process('generate-video', 2, async (job) => {
     if (!tutorial) throw new Error('Tutorial not found');
 
     const steps = await TutorialStep.find({ tutorialId }).sort({ stepNumber: 1 });
+    const stepsWithLocalPaths = await Promise.all(steps.map(async (step) => {
+      if (step.screenshotUrl) {
+        try {
+          const localPath = await downloadScreenshot(step.screenshotUrl, tutorialId, step.stepNumber);
+          return { ...step.toObject(), screenshotPath: localPath };
+        } catch (err) {
+          console.warn("[VideoWorker] Screenshot download failed:", err.message);
+          return step.toObject();
+        }
+      }
+      return step.toObject();
+    }));
     if (!steps.length) throw new Error('No steps found for this tutorial');
 
     await job.progress(10);
 
     // Generate voiceover for each step
-    const voicePaths = await generateFullVoiceover(steps, tutorial.voiceSettings, tutorialId);
+    const voicePaths = await generateFullVoiceover(stepsWithLocalPaths, tutorial.voiceSettings, tutorialId);
     await job.progress(30);
 
     // Generate subtitles
-    const srtPath = await generateFromSteps(steps, tutorialId);
+    const srtPath = await generateFromSteps(stepsWithLocalPaths, tutorialId);
     await job.progress(40);
 
     // Generate video with zoom effects
-    const videoPath = await generateTutorialVideo(steps, tutorial.voiceSettings, {
+    const videoPath = await generateTutorialVideo(stepsWithLocalPaths, tutorial.voiceSettings, {
       resolution: '1080p',
       format: 'mp4',
       tutorialId,
