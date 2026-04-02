@@ -9,11 +9,11 @@ import Loader from '../components/common/Loader';
 import useToast from '../hooks/useToast';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const toast = useToast();
   const { tutorials, loading, fetchAll, remove } = useTutorial();
 
-  useEffect(() => { fetchAll({ limit: 10 }); }, []);
+  useEffect(() => { fetchAll({ limit: 10 }); }, [isAuthenticated]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this tutorial? This cannot be undone.')) return;
