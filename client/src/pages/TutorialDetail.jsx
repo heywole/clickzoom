@@ -9,7 +9,7 @@ import ProgressBar from '../components/tutorial/ProgressBar';
 import Button from '../components/common/Button';
 import OutputSelector from '../components/tutorial/OutputSelector';
 import { contentService, tutorialService } from '../services/apiService';
-import { formatDate, formatDuration } from '../utils/helpers';
+import { formatDate } from '../utils/helpers';
 
 const TutorialDetail = () => {
   const { id } = useParams();
@@ -36,31 +36,21 @@ const TutorialDetail = () => {
     loadContent();
   }, [id]);
 
-  // Poll status when processing
   useEffect(() => {
     let interval;
     let timer;
-
     if (current?.status === 'processing') {
-      // Progress animation
       interval = setInterval(() => {
         setGenerationProgress(p => Math.min(p + 1.5, 90));
         loadContent();
-      }, 3000);
-
-      // Count elapsed time
-      timer = setInterval(() => {
-        setElapsedSeconds(s => s + 1);
-      }, 1000);
+        fetchById(id);
+      }, 4000);
+      timer = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
     } else if (current?.status === 'completed') {
       setGenerationProgress(100);
       loadContent();
     }
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(timer);
-    };
+    return () => { clearInterval(interval); clearInterval(timer); };
   }, [current?.status]);
 
   const handleGenerate = async () => {
@@ -80,15 +70,14 @@ const TutorialDetail = () => {
   };
 
   const handleCancelGeneration = async () => {
-    if (!window.confirm('Cancel this generation? The tutorial will go back to draft status.')) return;
     try {
       await tutorialService.update(id, { status: 'draft' });
-      toast.info('Generation cancelled');
-      fetchById(id);
+      toast.success('Generation cancelled');
       setGenerationProgress(0);
       setElapsedSeconds(0);
-    } catch {
-      toast.error('Failed to cancel');
+      fetchById(id);
+    } catch (err) {
+      toast.error('Cancel failed — please delete and recreate this tutorial');
     }
   };
 
@@ -99,10 +88,8 @@ const TutorialDetail = () => {
     navigate('/dashboard');
   };
 
-  const formatElapsed = (s) => {
-    if (s < 60) return `${s}s`;
-    return `${Math.floor(s / 60)}m ${s % 60}s`;
-  };
+  const formatElapsed = (s) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  const isStuck = current?.status === 'processing' && elapsedSeconds > 300;
 
   if (loading && !current) return <Loader text="Loading tutorial..." />;
   if (!current) return (
@@ -112,11 +99,8 @@ const TutorialDetail = () => {
     </div>
   );
 
-  const isStuck = current?.status === 'processing' && elapsedSeconds > 300; // 5 minutes
-
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -145,7 +129,6 @@ const TutorialDetail = () => {
         </button>
       </div>
 
-      {/* Processing progress */}
       {current.status === 'processing' && (
         <div className="bg-dark-card border border-electric-blue/30 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -156,23 +139,29 @@ const TutorialDetail = () => {
               <div>
                 <p className="font-semibold text-white">Generating your content...</p>
                 <p className="text-xs text-cz-gray">
-                  {isStuck ? 'Taking longer than expected...' : `This usually takes 2 to 5 minutes · ${formatElapsed(elapsedSeconds)} elapsed`}
+                  {isStuck ? 'Taking longer than expected...' : `Usually 2 to 5 minutes · ${formatElapsed(elapsedSeconds)} elapsed`}
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleCancelGeneration}>
+            <button
+              onClick={handleCancelGeneration}
+              className="px-4 py-2 rounded-lg border border-dark-border text-cz-gray hover:text-white hover:border-white transition-colors text-sm"
+            >
               Cancel
-            </Button>
+            </button>
           </div>
           <ProgressBar value={generationProgress} animated color="blue" />
 
           {isStuck && (
-            <div className="mt-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+            <div className="mt-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4">
               <p className="text-yellow-400 text-sm font-medium">Generation is taking longer than usual</p>
-              <p className="text-cz-gray text-xs mt-1">This may be because FFmpeg is still being set up on the server. You can cancel and try again in a few minutes.</p>
-              <Button variant="secondary" size="sm" className="mt-3" onClick={handleCancelGeneration}>
+              <p className="text-cz-gray text-xs mt-1">FFmpeg may still be setting up on the server. Cancel and try again in a few minutes.</p>
+              <button
+                onClick={handleCancelGeneration}
+                className="mt-3 px-4 py-2 rounded-lg bg-dark-card border border-dark-border text-white text-sm hover:border-white transition-colors"
+              >
                 Cancel and Try Again
-              </Button>
+              </button>
             </div>
           )}
 
@@ -186,25 +175,22 @@ const TutorialDetail = () => {
         </div>
       )}
 
-      {/* Failed status */}
       {current.status === 'failed' && (
         <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-6 mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-red-400 text-2xl">✕</span>
-            <div>
-              <p className="font-semibold text-red-400">Generation Failed</p>
-              <p className="text-xs text-cz-gray mt-0.5">Something went wrong during generation. Please try again.</p>
-            </div>
-          </div>
-          <Button variant="secondary" size="sm" onClick={() => {
-            tutorialService.update(id, { status: 'draft' }).then(() => fetchById(id));
-          }}>
+          <p className="font-semibold text-red-400 mb-2">Generation Failed</p>
+          <p className="text-xs text-cz-gray mb-4">Something went wrong. Click below to reset and try again.</p>
+          <button
+            onClick={async () => {
+              await tutorialService.update(id, { status: 'draft' });
+              fetchById(id);
+            }}
+            className="px-4 py-2 rounded-lg bg-dark-card border border-dark-border text-white text-sm"
+          >
             Reset and Try Again
-          </Button>
+          </button>
         </div>
       )}
 
-      {/* Completed content */}
       {current.status === 'completed' && content && (
         <div className="bg-neon-mint/5 border border-neon-mint/20 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
@@ -212,7 +198,7 @@ const TutorialDetail = () => {
               <div className="w-8 h-8 rounded-full bg-neon-mint/20 flex items-center justify-center text-neon-mint font-bold">✓</div>
               <div>
                 <p className="font-semibold text-white">Content Ready</p>
-                <p className="text-xs text-cz-gray">Download now — files are available for 24 hours</p>
+                <p className="text-xs text-cz-gray">Download now — files available for 24 hours</p>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -229,15 +215,9 @@ const TutorialDetail = () => {
               ))}
             </div>
           </div>
-          {content.contentType === 'video' && content.downloadUrls?.[0] && (
-            <div className="aspect-video rounded-xl overflow-hidden bg-black mt-4">
-              <video src={content.downloadUrls[0]} controls className="w-full h-full" />
-            </div>
-          )}
         </div>
       )}
 
-      {/* Generate section for draft */}
       {current.status === 'draft' && (
         <div className="bg-dark-card border border-dark-border rounded-xl p-6 mb-6">
           <h2 className="font-semibold text-white mb-4">Generate Content</h2>
@@ -261,11 +241,10 @@ const TutorialDetail = () => {
         </div>
       )}
 
-      {/* Steps list */}
       <div className="bg-dark-card border border-dark-border rounded-xl p-6">
         <h2 className="font-semibold text-white mb-4">Tutorial Steps ({current.steps?.length || 0})</h2>
         {(!current.steps || current.steps.length === 0) ? (
-          <p className="text-cz-gray text-sm text-center py-6">No steps captured yet. Steps will appear here after automated capture completes.</p>
+          <p className="text-cz-gray text-sm text-center py-6">No steps captured yet.</p>
         ) : (
           <div className="space-y-3">
             {current.steps.map((step, i) => (
@@ -277,11 +256,6 @@ const TutorialDetail = () => {
                   <p className="text-white text-sm">{step.instructionText}</p>
                   {step.clickTarget?.description && (
                     <p className="text-xs text-cz-gray mt-1">Click: {step.clickTarget.description}</p>
-                  )}
-                  {step.transactionDetails?.requiresTransaction && (
-                    <div className="mt-2 text-xs bg-orange-900/20 border border-orange-600/30 text-orange-400 px-3 py-1.5 rounded-lg inline-block">
-                      Note: You will need to complete this transaction {step.transactionDetails.transactionCount} times in total.
-                    </div>
                   )}
                 </div>
               </div>
