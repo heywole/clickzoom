@@ -189,3 +189,15 @@ exports.cancelGeneration = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.cancelGeneration = async (req, res, next) => {
+  try {
+    const tutorial = await Tutorial.findOne({ _id: req.params.id, creatorId: req.user._id });
+    if (!tutorial) return res.status(404).json({ message: 'Tutorial not found' });
+    tutorial.status = 'draft';
+    await tutorial.save();
+    res.json({ tutorial });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -181,7 +181,7 @@ const TutorialDetail = () => {
           <p className="text-xs text-cz-gray mb-4">Something went wrong. Click below to reset and try again.</p>
           <button
             onClick={async () => {
-              await tutorialService.update(id, { status: 'draft' });
+              await tutorialService.cancel(id);
               fetchById(id);
             }}
             className="px-4 py-2 rounded-lg bg-dark-card border border-dark-border text-white text-sm"

@@ -14,6 +14,7 @@ router.get('/', tutorialController.getTutorials);
 router.get('/:id', tutorialController.getTutorialById);
 router.put('/:id', tutorialController.updateTutorial);
 router.delete('/:id', tutorialController.deleteTutorial);
+router.post('/:id/cancel', tutorialController.cancelGeneration);
 
 // Generation
 router.post('/:id/generate', generateLimiter, checkFreeTierLock, contentController.generateContent);
