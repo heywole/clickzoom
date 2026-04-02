@@ -122,3 +122,8 @@ process.on('uncaughtException', (err) => { logger.error('Uncaught exception', { 
 
 start();
 module.exports = app;
+
+// Start workers
+require('./workers/captureWorker');
+require('./workers/videoWorker');
+require('./workers/imageWorker');
