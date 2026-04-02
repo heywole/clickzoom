@@ -28,6 +28,7 @@ export const tutorialService = {
   update: (id, data) => api.put(`/tutorials/${id}`, data),
   delete: (id) => api.delete(`/tutorials/${id}`),
   publish: (id) => api.post(`/tutorials/${id}/publish`),
+  cancel: (id) => api.post(`/tutorials/${id}/cancel`),
   generate: (id, data) => api.post(`/tutorials/${id}/generate`, data),
 };
 

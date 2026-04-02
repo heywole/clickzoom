@@ -71,7 +71,7 @@ const TutorialDetail = () => {
 
   const handleCancelGeneration = async () => {
     try {
-      await tutorialService.update(id, { status: 'draft' });
+      await tutorialService.cancel(id);
       toast.success('Generation cancelled');
       setGenerationProgress(0);
       setElapsedSeconds(0);
