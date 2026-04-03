@@ -127,8 +127,3 @@ module.exports = app;
 require('./workers/captureWorker');
 require('./workers/videoWorker');
 require('./workers/imageWorker');
-
-// Start workers
-require('./workers/captureWorker');
-require('./workers/videoWorker');
-require('./workers/imageWorker');

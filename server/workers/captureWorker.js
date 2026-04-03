@@ -1,4 +1,4 @@
-const { captureQueue } = require('../config/queue');
+const { captureQueue, videoQueue, imageQueue } = require('../config/queue');
 const Tutorial = require('../models/Tutorial');
 const TutorialStep = require('../models/TutorialStep');
 const { captureUrl } = require('../services/automation/puppeteerService');
@@ -52,7 +52,21 @@ captureQueue.process('capture-url', 1, async (job) => {
     const savedSteps = await TutorialStep.insertMany(stepDocs);
 
     tutorial.steps = savedSteps.map(s => s._id);
-    tutorial.status = 'draft'; // Ready for generation
+    // Auto-queue video/image generation after capture
+    const outputType = job.data.outputType || 'video';
+    const jobData = {
+      tutorialId: tutorial._id.toString(),
+      userId: job.data.userId,
+      outputType,
+      voiceSettings: tutorial.voiceSettings,
+    };
+    if (outputType === 'video' || outputType === 'both') {
+      await videoQueue.add('generate-video', jobData);
+    }
+    if (outputType === 'image' || outputType === 'both') {
+      await imageQueue.add('generate-images', jobData);
+    }
+    tutorial.status = 'processing';
     await tutorial.save();
 
     await job.progress(100);

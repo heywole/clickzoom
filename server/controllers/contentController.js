@@ -1,6 +1,6 @@
 const Tutorial = require('../models/Tutorial');
 const GeneratedContent = require('../models/GeneratedContent');
-const { videoQueue, imageQueue } = require('../config/queue');
+const { videoQueue, imageQueue, captureQueue } = require('../config/queue');
 const { sendContentReadyEmail } = require('../utils/email');
 const { scheduleDelete } = require('../config/storage');
 const User = require('../models/User');
@@ -29,6 +29,18 @@ exports.generateContent = async (req, res, next) => {
     tutorial.outputType = outputType;
     tutorial.status = 'processing';
     await tutorial.save();
+
+    // If tutorial has no steps and has a URL, run capture first
+    if ((!tutorial.steps || tutorial.steps.length === 0) && tutorial.targetUrl) {
+      await captureQueue.add('capture-url', {
+        tutorialId: tutorial._id.toString(),
+        userId: req.user._id.toString(),
+        targetUrl: tutorial.targetUrl,
+        outputType,
+        voiceSettings: tutorial.voiceSettings,
+      });
+      return res.json({ message: 'Capturing tutorial content first', status: 'processing', tutorialId: tutorial._id });
+    }
 
     const jobData = {
       tutorialId: tutorial._id.toString(),
