@@ -77,12 +77,8 @@ exports.getContent = async (req, res, next) => {
     let contentWithUrls = null;
     if (content) {
       contentWithUrls = content.toObject();
-      contentWithUrls.downloadUrls = content.fileKeys?.map(key =>
-        `${process.env.SERVER_URL || 'http://localhost:5000'}/downloads/${key}`
-      ) || content.fileUrls || [];
-
-      // Storage notice for users
-      contentWithUrls.storageNotice = 'Your content is ready to download. Save it to your device now. Cloud storage is coming soon.';
+      contentWithUrls.downloadUrls = content.fileUrls || [];
+      contentWithUrls.storageNotice = 'Files hosted on Cloudinary. Download before expiry.';
     }
 
     res.json({ content: contentWithUrls, tutorialStatus: tutorial.status });
