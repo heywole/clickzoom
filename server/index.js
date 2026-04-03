@@ -127,3 +127,11 @@ module.exports = app;
 require('./workers/captureWorker');
 require('./workers/videoWorker');
 require('./workers/imageWorker');
+
+// Serve React frontend
+app.use(express.static(path.join(__dirname, '../client/build')));
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/health') && !req.path.startsWith('/downloads')) {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  }
+});

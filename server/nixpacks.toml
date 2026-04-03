@@ -2,11 +2,10 @@
 nixPkgs = ["ffmpeg", "chromium", "nodejs_20"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install", "cd ../client && npm install"]
 
 [phases.build]
-cmds = []
+cmds = ["cd ../client && npm run build"]
 
 [start]
 cmd = "node index.js"
-# force redeploy Thu Apr  2 22:08:54 WAT 2026
