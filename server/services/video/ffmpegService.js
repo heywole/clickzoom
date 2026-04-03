@@ -62,9 +62,14 @@ const generateTutorialVideo = async (steps, voiceSettings, options = {}) => {
   return new Promise((resolve, reject) => {
     let cmd = ffmpeg();
 
-    inputArgs.forEach((arg, i) => {
-      if (i % 2 === 0) cmd = cmd.input(inputArgs[i + 1]);
-    });
+    // Add each screenshot as a looped input
+    for (let i = 0; i < inputIndex; i++) {
+      const step = steps[i];
+      if (step.screenshotPath && require('fs').existsSync(step.screenshotPath)) {
+        cmd = cmd.addInput(step.screenshotPath)
+                 .inputOptions(['-loop 1', '-t 4']);
+      }
+    }
 
     cmd
       .complexFilter(filterParts.join(';'))
