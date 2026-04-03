@@ -1,4 +1,5 @@
 import axios from 'axios';
+import store from './../store';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
@@ -39,7 +40,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         clearAccessToken();
-        window.location.href = '/login';
+        clearAccessToken(); store.dispatch({ type: "auth/logout/fulfilled" });
       }
     }
     return Promise.reject(error);
