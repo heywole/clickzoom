@@ -2,10 +2,10 @@
 nixPkgs = ["ffmpeg", "chromium", "nodejs_20"]
 
 [phases.install]
-cmds = ["npm install", "cd ../client && npm install"]
+cmds = ["npm install"]
 
 [phases.build]
-cmds = ["cd ../client && npm run build"]
+cmds = ["npm install --prefix ../client", "npm run build --prefix ../client"]
 
 [start]
 cmd = "node index.js"
