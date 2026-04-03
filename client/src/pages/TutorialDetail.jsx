@@ -193,27 +193,46 @@ const TutorialDetail = () => {
 
       {current.status === 'completed' && content && (
         <div className="bg-neon-mint/5 border border-neon-mint/20 rounded-xl p-6 mb-6">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-neon-mint/20 flex items-center justify-center text-neon-mint font-bold">✓</div>
-              <div>
-                <p className="font-semibold text-white">Content Ready</p>
-                <p className="text-xs text-cz-gray">Download now — files available for 24 hours</p>
-              </div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-neon-mint/20 flex items-center justify-center text-neon-mint font-bold">✓</div>
+            <div>
+              <p className="font-semibold text-white">Content Ready</p>
+              <p className="text-xs text-cz-gray">Download now — files available for 24 hours</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {content.downloadUrls?.map((url, i) => (
-                <a key={i} href={url} download
-                  className="flex items-center gap-2 bg-neon-mint hover:bg-green-400 text-deep-dark font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  {content.contentType === 'video' && i === 0 ? 'Download Video' :
-                   content.contentType === 'video' && i === 1 ? 'Download Subtitles' :
-                   `Download Image ${i + 1}`}
-                </a>
+          </div>
+
+          {content.contentType === 'image_set' && content.downloadUrls?.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+              {content.downloadUrls.map((url, i) => (
+                <div key={i} className="relative group rounded-xl overflow-hidden border border-dark-border bg-deep-dark">
+                  <img src={url} alt={`Step ${i + 1}`} className="w-full h-40 object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <a href={url} download className="bg-neon-mint text-deep-dark font-bold px-3 py-1.5 rounded-lg text-xs">Download</a>
+                  </div>
+                  <p className="text-xs text-cz-gray text-center py-2">Step {i + 1}</p>
+                </div>
               ))}
             </div>
+          )}
+
+          {content.contentType === 'video' && content.downloadUrls?.[0] && (
+            <div className="mb-5 rounded-xl overflow-hidden border border-dark-border">
+              <video controls className="w-full max-h-80" src={content.downloadUrls[0]} />
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            {content.downloadUrls?.map((url, i) => (
+              <a key={i} href={url} download
+                className="flex items-center gap-2 bg-neon-mint hover:bg-green-400 text-deep-dark font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                {content.contentType === 'video' && i === 0 ? 'Download Video' :
+                 content.contentType === 'video' && i === 1 ? 'Download Subtitles' :
+                 `Download Image ${i + 1}`}
+              </a>
+            ))}
           </div>
         </div>
       )}
