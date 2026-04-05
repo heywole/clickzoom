@@ -17,16 +17,6 @@ const downloadToTemp = async (url, filename) => {
   await fs.writeFile(tmpPath, response.data);
   return tmpPath;
 };
-const axios = require('axios');
-const os = require('os');
-const path = require('path');
-
-const downloadToTemp = async (url, filename) => {
-  const tmpPath = require('path').join(os.tmpdir(), filename);
-  const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
-  await fs.writeFile(tmpPath, response.data);
-  return tmpPath;
-};
 
 imageQueue.process('generate-images', 2, async (job) => {
   const { tutorialId, userId, outputType } = job.data;
