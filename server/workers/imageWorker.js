@@ -12,7 +12,7 @@ const os = require('os');
 const path = require('path');
 
 const downloadToTemp = async (url, filename) => {
-  const tmpPath = require('path').join(os.tmpdir(), filename);
+  const tmpPath = path.join(os.tmpdir(), filename);
   const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
   await fs.writeFile(tmpPath, response.data);
   return tmpPath;
@@ -30,39 +30,23 @@ imageQueue.process('generate-images', 2, async (job) => {
     const steps = await TutorialStep.find({ tutorialId }).sort({ stepNumber: 1 });
     if (!steps.length) throw new Error('No steps found');
 
-    // Download screenshots from remote URLs to local temp files
-    const stepsWithLocalPaths = await Promise.all(steps.map(async (step) => {
-      const s = step.toObject();
-      if (s.screenshotUrl && !s.screenshotPath) {
-        try {
-          s.screenshotPath = await downloadToTemp(s.screenshotUrl, tutorialId + '_step_' + s.stepNumber + '.png');
-        } catch (e) {
-          console.warn('[ImageWorker] Screenshot download failed:', e.message);
-        }
-      }
-      return s;
-    }));
-
-    // Download screenshots from remote URLs to local temp files
-    const stepsWithLocalPaths = await Promise.all(steps.map(async (step) => {
-      const s = step.toObject();
-      if (s.screenshotUrl && !s.screenshotPath) {
-        try {
-          s.screenshotPath = await downloadToTemp(s.screenshotUrl, tutorialId + '_step_' + s.stepNumber + '.png');
-        } catch (e) {
-          console.warn('[ImageWorker] Screenshot download failed:', e.message);
-        }
-      }
-      return s;
-    }));
-
     await job.progress(10);
 
-    // Annotate all steps
+    const stepsWithLocalPaths = await Promise.all(steps.map(async (step) => {
+      const s = step.toObject();
+      if (s.screenshotUrl && !s.screenshotPath) {
+        try {
+          s.screenshotPath = await downloadToTemp(s.screenshotUrl, tutorialId + '_step_' + s.stepNumber + '.png');
+        } catch (e) {
+          console.warn('[ImageWorker] Screenshot download failed:', e.message);
+        }
+      }
+      return s;
+    }));
+
     const annotatedSteps = await annotateAllSteps(stepsWithLocalPaths, tutorialId);
     await job.progress(60);
 
-    // Save all annotated images locally
     const fileUrls = [];
     const fileKeys = [];
 
@@ -74,13 +58,12 @@ imageQueue.process('generate-images', 2, async (job) => {
         scheduleDelete(key, 24 * 60 * 60 * 1000);
         await fs.unlink(annotatedPath).catch(() => {});
       } catch (err) {
-        console.warn(`[ImageWorker] Save failed:`, err.message);
+        console.warn('[ImageWorker] Save failed:', err.message);
       }
     }
 
     await job.progress(85);
 
-    // Save GeneratedContent
     const existing = await GeneratedContent.findOne({ tutorialId, contentType: 'image_set' });
     const contentData = {
       tutorialId,
@@ -99,7 +82,6 @@ imageQueue.process('generate-images', 2, async (job) => {
       await GeneratedContent.create(contentData);
     }
 
-    // Update tutorial
     const freshTutorial = await Tutorial.findById(tutorialId);
     if (freshTutorial.status !== 'completed') {
       freshTutorial.status = 'completed';
