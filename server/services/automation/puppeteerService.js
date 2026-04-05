@@ -12,6 +12,7 @@ const ensureDir = async () => {
 const launchBrowser = async () => {
   return puppeteer.launch({
     headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -22,6 +23,8 @@ const launchBrowser = async () => {
       '--single-process',
       '--disable-gpu',
       '--window-size=1440,900',
+      '--disable-blink-features=AutomationControlled',
+      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     ],
     defaultViewport: { width: 1440, height: 900 },
   });
@@ -34,6 +37,16 @@ const captureUrl = async (targetUrl, tutorialId, onProgress) => {
 
   try {
     const page = await browser.newPage();
+
+    // Stealth mode - bypass bot detection
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      window.chrome = { runtime: {} };
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
     // Intercept wallet connection prompts
     await page.setRequestInterception(true);
