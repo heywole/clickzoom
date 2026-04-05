@@ -30,11 +30,13 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
+        const refreshToken = localStorage.getItem('cz_refresh_token');
         const { data } = await axios.post(
           `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
-          {},
-          { withCredentials: true }
+          { refreshToken },
+          { headers: { 'x-refresh-token': refreshToken || '' } }
         );
+        if (data.refreshToken) localStorage.setItem('cz_refresh_token', data.refreshToken);
         setAccessToken(data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(originalRequest);

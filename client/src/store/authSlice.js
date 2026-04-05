@@ -6,7 +6,7 @@ export const login = createAsyncThunk('auth/login', async (credentials, { reject
   try {
     const { data } = await authService.login(credentials);
     setAccessToken(data.accessToken);
-    // Persist user in localStorage so refresh works
+    if (data.refreshToken) localStorage.setItem('cz_refresh_token', data.refreshToken);
     localStorage.setItem('cz_user', JSON.stringify(data.user));
     return data;
   } catch (err) {
@@ -43,7 +43,8 @@ export const fetchProfile = createAsyncThunk('auth/fetchProfile', async (_, { re
   } catch (err) {
     // Try refresh token first before giving up
     try {
-      const { data: refreshData } = await authService.refreshToken();
+      const refreshToken = localStorage.getItem('cz_refresh_token');
+      const { data: refreshData } = await authService.refreshToken(refreshToken);
       setAccessToken(refreshData.accessToken);
       const { data: profileData } = await userService.getProfile();
       localStorage.setItem('cz_user', JSON.stringify(profileData.user));

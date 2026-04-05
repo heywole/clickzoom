@@ -53,8 +53,7 @@ exports.login = async (req, res, next) => {
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-    res.json({ accessToken, user: user.toPublicJSON() });
+    res.json({ accessToken, refreshToken, user: user.toPublicJSON() });
   } catch (err) {
     next(err);
   }
@@ -65,8 +64,7 @@ exports.googleCallback = async (req, res) => {
     const user = req.user;
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}&refresh=${refreshToken}`);
   } catch {
     res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
   }
@@ -79,15 +77,14 @@ exports.logout = (req, res) => {
 
 exports.refreshToken = async (req, res, next) => {
   try {
-    const token = req.cookies.refreshToken;
+    const token = req.cookies.refreshToken || req.body.refreshToken || req.headers['x-refresh-token'];
     if (!token) return res.status(401).json({ message: 'No refresh token' });
     const decoded = verifyRefreshToken(token);
     const user = await User.findById(decoded.userId);
     if (!user) return res.status(401).json({ message: 'User not found' });
     const accessToken = generateAccessToken(user._id);
     const newRefresh = generateRefreshToken(user._id);
-    res.cookie('refreshToken', newRefresh, REFRESH_COOKIE_OPTIONS);
-    res.json({ accessToken });
+    res.json({ accessToken, refreshToken: newRefresh });
   } catch (err) {
     if (err.name === 'TokenExpiredError') return res.status(401).json({ message: 'Session expired, please login again' });
     next(err);
